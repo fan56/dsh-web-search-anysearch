@@ -1,0 +1,8 @@
+# dsh-web-search-anysearch bundle patch: mounts the plugin into the profile's
+# assembly tree under the stable plugin id `web-search-anysearch`. The plugin
+# registers an AnySearch-backed WebSearchProvider with the `ctx.web` seam;
+# select it by overriding the web plugin's `searchProvider` config (see README).
+
+- insert:
+    - id: web-search-anysearch
+      name: '@aiwayds/dsh-web-search-anysearch'

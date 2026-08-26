@@ -37,7 +37,7 @@ Add the package to a dsh profile — `~/.dsh/profiles/<name>/package.json`:
 ```json
 {
   "dependencies": {
-    "@aiwayds/dsh-web-search-anysearch": "github:fan56/dsh-web-search-anysearch"
+    "@aiwayds/dsh-web-search-anysearch": "^0.1.0"
   },
   "dsh": {
     "profile": {
@@ -50,8 +50,8 @@ Add the package to a dsh profile — `~/.dsh/profiles/<name>/package.json`:
 then `pnpm install` in the profile directory and restart dsh. **That is the whole
 install** — the plugin mounts itself AND claims the `web_search` default at the bundle
 layer, so with zero configuration the model's `web_search` tool runs on AnySearch
-(anonymous access needs no key). For local development use
-`"link:/path/to/dsh-web-search-anysearch"`.
+(anonymous access needs no key). Also installable as `"github:fan56/dsh-web-search-anysearch"` or, for local
+development, `"link:/path/to/dsh-web-search-anysearch"`.
 
 > `@deepseek-ai/*` packages are **peer dependencies by design**: they must resolve to
 > the profile's single shared dsh closure. Putting them in `dependencies` installs a

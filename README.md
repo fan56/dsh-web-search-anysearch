@@ -32,26 +32,23 @@ config). Point an MCP client at AnySearch for the full toolset.
 
 ## Install
 
-Add the package to a dsh profile — `~/.dsh/profiles/<name>/package.json`:
+One command:
 
-```json
-{
-  "dependencies": {
-    "@aiwayds/dsh-web-search-anysearch": "^0.1.0"
-  },
-  "dsh": {
-    "profile": {
-      "bundles": ["@deepseek-ai/dsh-base", "@aiwayds/dsh-web-search-anysearch"]
-    }
-  }
-}
+```sh
+dsh plugin --profile <name> add @aiwayds/dsh-web-search-anysearch
 ```
 
-then `pnpm install` in the profile directory and restart dsh. **That is the whole
-install** — the plugin mounts itself AND claims the `web_search` default at the bundle
+`dsh plugin` installs the package into the profile (via pnpm) and registers it in
+`dsh.profile.bundles` automatically — the package declares `dsh.bundle`, so the
+official CLI reconciles the layer stack by itself. Restart dsh. **That is the whole
+install**: the plugin mounts itself AND claims the `web_search` default at the bundle
 layer, so with zero configuration the model's `web_search` tool runs on AnySearch
-(anonymous access needs no key). Also installable as `"github:fan56/dsh-web-search-anysearch"` or, for local
-development, `"link:/path/to/dsh-web-search-anysearch"`.
+(anonymous access needs no key).
+
+Local development: `dsh plugin --profile <name> add link:/path/to/dsh-web-search-anysearch`
+(relative path specs anchor to your invoking directory). The manual route — adding the
+dependency and the bundle entry to `~/.dsh/profiles/<name>/package.json` yourself and
+running `pnpm install` there — works identically.
 
 > `@deepseek-ai/*` packages are **peer dependencies by design**: they must resolve to
 > the profile's single shared dsh closure. Putting them in `dependencies` installs a

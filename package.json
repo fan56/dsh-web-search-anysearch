@@ -1,6 +1,6 @@
 {
   "name": "@aiwayds/dsh-web-search-anysearch",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AnySearch web search provider plugin for DeepSeek Harness (dsh)",
   "license": "MIT",
   "type": "module",

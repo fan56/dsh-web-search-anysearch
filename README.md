@@ -47,17 +47,22 @@ Add the package to a dsh profile — `~/.dsh/profiles/<name>/package.json`:
 }
 ```
 
-then `pnpm install` in the profile directory and restart dsh. For local development use
+then `pnpm install` in the profile directory and restart dsh. **That is the whole
+install** — the plugin mounts itself AND claims the `web_search` default at the bundle
+layer, so with zero configuration the model's `web_search` tool runs on AnySearch
+(anonymous access needs no key). For local development use
 `"link:/path/to/dsh-web-search-anysearch"`.
 
 > `@deepseek-ai/*` packages are **peer dependencies by design**: they must resolve to
 > the profile's single shared dsh closure. Putting them in `dependencies` installs a
 > second cordis instance and crashes the loader.
 
-## Configure
+## Configure (all optional)
 
-**1. API key (optional).** For higher rate limits, store the key in dsh's managed
-credentials document (`~/.dsh/.credentials.yaml`):
+**API key — only needed for higher rate limits.** Anonymous access is valid AnySearch
+usage; when the anonymous quota runs out, the search error names the credential to
+configure. Store the key in dsh's managed credentials document
+(`~/.dsh/.credentials.yaml`):
 
 ```yaml
 version: 1
@@ -65,23 +70,20 @@ refs:
   ANYSEARCH_API_KEY: <your_key>
 ```
 
-Without a key the provider runs anonymously; when the anonymous quota runs out, the
-error tells the user which credential to configure.
-
-**2. Select the provider.** The base bundle pins `web.searchProvider` to
-`deepseek-official`, and a configured id always wins — add the override to the profile's
-`cordis.patch.yml` (or the home-level `~/.dsh/cordis.patch.yml`):
+**Keep another engine as the default?** Your own patch layer always outranks the
+plugin's bundle patch — one entry, no need to touch the plugin:
 
 ```yaml
+# profile cordis.patch.yml or ~/.dsh/cordis.patch.yml
 - id: web
   config:
-    searchProvider: anysearch
+    searchProvider: tavily   # or deepseek-official, exa, ...
 ```
 
-Restart dsh. **Verify**:
+**Verify** which engine owns `web_search`:
 
 ```sh
-dsh --profile <name> --dump-config | grep -A3 'id: web$'   # searchProvider: anysearch
+dsh --profile <name> --dump-config | grep -A3 'id: web$'
 ```
 
 **Plugin config** (all optional; via a patch layer, read at startup):

@@ -1,8 +1,23 @@
-# dsh-web-search-anysearch bundle patch: mounts the plugin into the profile's
-# assembly tree under the stable plugin id `web-search-anysearch`. The plugin
-# registers an AnySearch-backed WebSearchProvider with the `ctx.web` seam;
-# select it by overriding the web plugin's `searchProvider` config (see README).
+# dsh-web-search-anysearch bundle patch.
+#
+# Two jobs, so the plugin is out-of-the-box:
+# 1. Mount the plugin (registers an AnySearch-backed WebSearchProvider, id
+#    "anysearch", with the ctx.web seam).
+# 2. Select it for the web_search tool. The base bundle pins
+#    `web.searchProvider: deepseek-official`, so a provider that only
+#    registers would never run. AnySearch is the one provider that can be
+#    selected with zero configuration — anonymous access is valid usage —
+#    so claiming the default here is safe: no key, no setup, search works.
+#
+# Layering: bundle patches apply after the base bundle and BEFORE any user
+# patch (profile cordis.patch.yml / home ~/.dsh/cordis.patch.yml / --patch),
+# so a user override always wins. To keep another engine as the default,
+# add `- id: web / config: { searchProvider: <id> }` to your own patch
+# layer — no need to edit this file.
 
 - insert:
     - id: web-search-anysearch
       name: '@aiwayds/dsh-web-search-anysearch'
+- id: web
+  config:
+    searchProvider: anysearch

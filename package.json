@@ -3,6 +3,10 @@
   "version": "0.1.1",
   "description": "AnySearch web search provider plugin for DeepSeek Harness (dsh)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fan56/dsh-web-search-anysearch.git"
+  },
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

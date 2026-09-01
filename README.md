@@ -4,6 +4,8 @@ A [DeepSeek Harness (dsh)](https://github.com/deepseek-ai/deepseek-harness) plug
 provides web search through [AnySearch](https://anysearch.com) — "AI Search Infrastructure
 for Agents".
 
+**Requires dsh >= 0.1.2-alpha.3** — the plugin targets the 0.1.2-alpha host line only; the rc line is no longer supported.
+
 The plugin registers a `WebSearchProvider` (`id: "anysearch"`) with the official
 [`ctx.web` capability seam](https://github.com/deepseek-ai/deepseek-harness/tree/main/packages/web/web),
 so the model keeps calling the same `web_search` tool with the same citation formatting

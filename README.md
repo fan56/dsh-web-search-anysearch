@@ -56,6 +56,29 @@ running `pnpm install` there — works identically.
 > the profile's single shared dsh closure. Putting them in `dependencies` installs a
 > second cordis instance and crashes the loader.
 
+## Uninstall
+
+```sh
+dsh plugin --profile <name> remove @aiwayds/dsh-web-search-anysearch
+```
+
+The host auto-cleans the whole install: the bundles entry is spliced out of the
+profile's `package.json`, the dependency is removed, and the plugin's patch
+layer drops with the package — **including the `searchProvider: anysearch`
+claim** the patch placed on the host `web` row, so `web_search` reverts to the
+host default (`deepseek-official`). Restart dsh and it is as if the plugin was
+never installed.
+
+There is no on-disk state to clean up: the plugin is stateless (no cache, no
+config writes). The optional API key, if you ever stored one, lives in the
+host-owned credentials document — remove it there if unwanted.
+
+One caveat: if you hand-copied the selection into your **own** patch layer
+(`searchProvider: anysearch` in the profile or home `cordis.patch.yml`), that
+line outlives the plugin — searches then fail gracefully with
+`WEB_PROVIDER_UNAVAILABLE` (no provider with that id is registered) until you
+delete the line.
+
 ## Configure (all optional)
 
 **API key — only needed for higher rate limits.** Anonymous access is valid AnySearch

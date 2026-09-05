@@ -11,9 +11,13 @@
 //   5. a real boot under a timeout must load the plugin tree without a
 //      loader error (a healthy boot is silent and survives to the kill
 //      signal; a broken plugin dies within ~1s with the loader error)
+//   6. `dsh plugin --profile smoke remove <pkg>` must reconcile the profile —
+//      a second dump must prove the composed tree is back to stock (the
+//      bundles entry spliced, the patch layer — including its
+//      `searchProvider: anysearch` claim on the host `web` row — dropped)
 //
-// Exit 0 = mounted and boots clean. Temp dir is kept and printed on failure,
-// removed on success.
+// Exit 0 = mounted, boots clean, and removes clean. Temp dir is kept and
+// printed on failure, removed on success.
 //
 // dsh-web-search-anysearch note: the provider registers into ctx.web and is
 // never invoked by a boot; the smoke proves the plugin LOADS and APPLIES —
@@ -103,5 +107,20 @@ if (boot.signal !== 'SIGKILL' && boot.status !== 0) {
   fail(`dsh exited early with code ${boot.status} and no loader error — unexpected`, output)
 }
 
-console.log(`smoke-boot: PASS — ${ownName} composed into the scratch profile tree and booted clean in real dsh (${boot.signal === 'SIGKILL' ? `survived ${bootSeconds}s boot window` : `exited ${boot.status}`})`)
+// Phase 3 — uninstall leg: removal must reconcile the profile tree back to
+// stock (the bundles entry spliced, the plugin's patch layer dropped with it).
+const remove = spawnSync('dsh', ['plugin', '--profile', 'smoke', 'remove', ownName], { cwd: profile, encoding: 'utf8', env: dshEnv })
+if (remove.status !== 0 || remove.error) fail('dsh plugin remove failed', `${remove.stdout}\n${remove.stderr}`)
+const dumpAfter = spawnSync('dsh', ['--profile', 'smoke', '--dump-config'], { cwd: profile, encoding: 'utf8', env: dshEnv })
+if (dumpAfter.status !== 0 || dumpAfter.error) fail('dsh --dump-config failed after removal', `${dumpAfter.stdout}\n${dumpAfter.stderr}`)
+if (dumpAfter.stdout.includes('web-search-anysearch')) {
+  fail('the composed tree still contains the plugin entry after removal', dumpAfter.stdout)
+}
+// The patch layer claimed the host `web` row's config; the claim must vanish
+// with the package and the web_search selection must revert to the host default.
+if (dumpAfter.stdout.includes('searchProvider: anysearch')) {
+  fail("the host web row still selects anysearch after removal — the patch claim didn't drop with the package", dumpAfter.stdout)
+}
+
+console.log(`smoke-boot: PASS — ${ownName} composed into the scratch profile tree and booted clean in real dsh (${boot.signal === 'SIGKILL' ? `survived ${bootSeconds}s boot window` : `exited ${boot.status}`}); removal restored the stock tree`)
 rmSync(work, { recursive: true, force: true })

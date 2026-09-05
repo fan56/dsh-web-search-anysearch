@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-09-05
+
+### Changed
+- Clean-uninstall story, documented and tested: the README gains an Uninstall section (the removal command, the host auto-clean including the patch's `searchProvider: anysearch` claim on the host `web` row — selection reverts to the host default — the no-on-disk-state statement, and the `WEB_PROVIDER_UNAVAILABLE` caveat for hand-copied claims), and the boot smoke gains an uninstall leg: after the boot proof it runs `dsh plugin --profile smoke remove` against the scratch profile and asserts the second `--dump-config` no longer contains the plugin entry nor the `searchProvider: anysearch` claim — removal must reconcile the composed tree back to stock.
+
 ## [0.3.0] - 2026-09-03
 
 ### Changed

@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "dsh-web-search-anysearch",
+    "description": "AnySearch web search provider: serves the harness /web tool through your AnySearch credentials."
+  }
+}

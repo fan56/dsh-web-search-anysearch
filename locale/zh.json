@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "dsh-web-search-anysearch",
+    "description": "基于 AnySearch 的网页搜索 provider，用你的 AnySearch 凭据驱动 /web 工具。"
+  }
+}

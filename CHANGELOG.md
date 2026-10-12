@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.7.0] - 2026-10-12
 
 ### Added
 - **API-key row on the plugin's own page in the Plugins section.** The package now ships a Client half (`src/client.ts` → `lib/client.js`): it claims the keyed `plugins.row.config` slot on this package's own row, so the row gains a **Configure** page — one write-only field that stores the `ANYSEARCH_API_KEY` credential through dsh's credentials service, a badge reporting whether a key is configured, and **Clear key** (confirmed once) that removes the reference again and returns searches to the anonymous limits. A key supplied by the launching environment or a `.env` fallback reads as read-only, and the page says so instead of offering a write. Nothing is written into a configuration file, and the provider already re-resolves the reference on every search, so no restart is involved. `package.json` declares the `dsh.client` half and the `exports` map the browser module table resolves (`"."`, `"./client"`, `"./package.json"`, `"./cordis.patch.yml"`, `"./locale/*.json"`).

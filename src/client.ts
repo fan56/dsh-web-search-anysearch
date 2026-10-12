@@ -223,12 +223,15 @@ void (function anysearchApiKeyRow() {
         const [confirming, setConfirming] = useState(false)
         const alive = useRef(true)
 
-        useEffect(
-          () => () => {
+        useEffect(() => {
+          // Set inside the effect body (not just cleared in the cleanup) so a
+          // StrictMode double-mount re-arms the sentinel instead of leaving
+          // the page permanently in the loading state.
+          alive.current = true
+          return () => {
             alive.current = false
-          },
-          [],
-        )
+          }
+        }, [])
 
         const load = useCallback(async () => {
           try {

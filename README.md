@@ -96,7 +96,11 @@ Or fill it from the GUI: **Settings → Plugins → the `dsh-web-search-anysearc
 its `web-search-anysearch` row → Configure**. That page writes the same
 `ANYSEARCH_API_KEY` reference through dsh's credentials service and reports whether a
 key is currently configured. The field is write-only — a stored key never rides a
-response back to the page — and a blank field keeps the current key. One more click
+response back to the page — and a blank field keeps the current key. The page always
+manages the default `ANYSEARCH_API_KEY` reference: if you re-point the provider's
+`apiKeyEnv` config at a different reference, the GUI row and the provider will
+disagree — keep the default and edit the credentials file directly for custom refs.
+One more click
 (**Clear key**, which asks once) removes the reference again, returning searches to the
 anonymous limits. A key supplied by the launching environment or a `.env` fallback is
 read-only, and the page says so instead of offering a write.

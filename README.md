@@ -92,6 +92,20 @@ refs:
   ANYSEARCH_API_KEY: <your_key>
 ```
 
+Or fill it from the GUI: **Settings → Plugins → the `dsh-web-search-anysearch` bundle →
+its `web-search-anysearch` row → Configure**. That page writes the same
+`ANYSEARCH_API_KEY` reference through dsh's credentials service and reports whether a
+key is currently configured. The field is write-only — a stored key never rides a
+response back to the page — and a blank field keeps the current key. One more click
+(**Clear key**, which asks once) removes the reference again, returning searches to the
+anonymous limits. A key supplied by the launching environment or a `.env` fallback is
+read-only, and the page says so instead of offering a write.
+
+Both routes land in the same document under the same reference, so they are
+interchangeable: a key typed in the GUI is visible to a hand edit and vice versa.
+Nothing is written into a configuration file, and the provider re-resolves the
+reference on every search, so no restart is needed either way.
+
 **Keep another engine as the default?** Your own patch layer always outranks the
 plugin's bundle patch — one entry, no need to touch the plugin:
 
@@ -140,6 +154,13 @@ npm test        # build + node --test (transport runs against a local HTTP serve
 ```
 
 After editing `src/`, run `npm run build` and restart dsh.
+
+The browser half (`src/client.ts` → `lib/client.js`) is a classic script the Web page
+evaluates directly, so `npm run build` also runs `scripts/build-client.mjs`: TypeScript
+always marks a `.ts` file in this package as a module, and that step strips the marker it
+adds and fails the build if the artifact ever carries module syntax. `npm test` covers
+the Client half too — artifact shape, the row page it claims, and the credential writes
+it performs.
 
 ## License
 

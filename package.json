@@ -18,6 +18,16 @@
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
   "icon": "./icon.svg",
   "files": [
     "lib",
@@ -26,9 +36,9 @@
     "locale/*.json"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
     "check": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run build && node --test test/transport.test.mjs test/markdown.test.mjs test/provider.test.mjs test/apply.test.mjs test/bundle-patch.test.mjs",
+    "test": "npm run build && node --test test/transport.test.mjs test/markdown.test.mjs test/provider.test.mjs test/apply.test.mjs test/client.test.mjs test/bundle-patch.test.mjs",
     "smoke": "node scripts/smoke-boot.mjs"
   },
   "peerDependencies": {
@@ -50,6 +60,14 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-plugin-manager",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
     }
   }
 }

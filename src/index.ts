@@ -42,14 +42,35 @@ export const name = 'web-search-anysearch'
 /** The web seam this provider registers into. */
 export const inject = ['web']
 
+/** The credential reference the GUI row and the provider share when config names none. */
 const DEFAULT_API_KEY_ENV = 'ANYSEARCH_API_KEY'
 
 /** Environment variable overriding the JSON-RPC endpoint. */
 const ENDPOINT_ENV = 'ANYSEARCH_ENDPOINT'
 
-/** Plugin config (all optional — `apply` fills credential, env-var, and constant defaults). */
+/**
+ * A configuration field the loader hands over as a live reference. A `volatile`
+ * field is read through `get()` so a settings write applies to the next read;
+ * a plain object (a unit test, a direct caller) carries the value itself.
+ */
+export interface LiveConfigField<T> {
+  get(): T
+}
+
+/**
+ * Plugin config as a configuration layer states it (all optional — the schema fills the rest).
+ * `apiKeyEnv` is volatile, so `apply` receives it as a live reference: that shape
+ * is {@link RunningConfig}, which is what the loader hands over and what the
+ * tests construct through the schema.
+ */
 export interface Config {
-  /** Literal AnySearch API key; prefer {@link apiKeyEnv} so no secret enters configuration files. */
+  /**
+   * Literal AnySearch API key; prefer {@link apiKeyEnv} so no secret enters
+   * configuration files. Not volatile on purpose: a literal key is the fallback
+   * for deployments without a credentials service, it is read once when the
+   * plugin activates, and the credential *reference* is the route a settings
+   * edit is meant to move.
+   */
   apiKey?: string
   /** Credential reference resolved for each search; defaults to `ANYSEARCH_API_KEY`. */
   apiKeyEnv?: string
@@ -63,9 +84,33 @@ export interface Config {
   maxResults?: number
 }
 
-export const Config: z<Config> = z.object({
+/**
+ * The config `apply` receives. `apiKeyEnv` is volatile — it rides the entry's
+ * settings form, which is how the Plugins row page reads the accepted reference
+ * back — so the loader hands that one field over as a live reference
+ * ({@link LiveConfigField}) rather than the plain string a configuration file
+ * states.
+ */
+export interface RunningConfig extends Omit<Config, 'apiKeyEnv'> {
+  apiKeyEnv?: string | LiveConfigField<string>
+}
+
+/**
+ * The plugin's Config schema: `z<Input, Output>` — schemastery's first parameter
+ * is what the schema accepts, the second what it emits (`Schema<S, T, Mode>`,
+ * whose call signature is `(data?: S) => SchemaOutput<T, Mode>`). So this pins
+ * the schema to accepting what a configuration layer states and emitting what
+ * `apply` receives.
+ *
+ * The order is not assumed, it is forced: a volatile field's output is
+ * `Volatile<string>`, which is assignable to `RunningConfig.apiKeyEnv` but not to
+ * `Config.apiKeyEnv`, so a reversed binding would not compile at all. The pin
+ * bites in the other direction too — dropping the live-reference union from
+ * `RunningConfig` (or adding a field the schema does not emit) is a type error.
+ */
+export const Config: z<Config, RunningConfig> = z.object({
   apiKey: z.string().role('secret'),
-  apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_API_KEY_ENV),
+  apiKeyEnv: z.string().role('credential-ref').default(DEFAULT_API_KEY_ENV).volatile(),
   endpoint: z.string(),
   timeoutMs: z.number().step(1).min(1000),
   domain: z.union(ANYSEARCH_DOMAINS),
@@ -73,12 +118,29 @@ export const Config: z<Config> = z.object({
 })
 
 /**
+ * Read the credential-reference field. The loader hands a volatile field over as
+ * a live reference, whose value a settings write can change between searches; a
+ * plain string (a direct caller, a configuration layer read outside the loader)
+ * passes through. Deliberately not generic: the structural read is sound for
+ * this one field, and the schema rejects every other type before `apply` sees it.
+ * `null` is tolerated for untyped callers even though the schema never emits it.
+ */
+function liveValue(field: string | LiveConfigField<string> | null | undefined): string | undefined {
+  if (field === undefined || field === null) return undefined
+  return typeof field === 'string' ? field : field.get()
+}
+
+/**
  * Project one resolved config into the options the provider serves its next
  * search with. Environment fallbacks stay here rather than in the provider:
  * every value it reads is already fully defaulted.
  */
-function resolveOptions(ctx: Context, config: Config): AnysearchSearchProviderOptions {
-  const ref = credentialRef(config.apiKeyEnv ?? DEFAULT_API_KEY_ENV)
+function resolveOptions(ctx: Context, config: RunningConfig): AnysearchSearchProviderOptions {
+  // A blank or whitespace-only reference is not a name the provider could
+  // resolve. The row page treats such a value as absent, so this half does too —
+  // otherwise the GUI would manage the default while every search threw.
+  const named = liveValue(config.apiKeyEnv)?.trim() ?? ''
+  const ref = credentialRef(named.length > 0 ? named : DEFAULT_API_KEY_ENV)
   const literalApiKey = config.apiKey !== undefined && config.apiKey.length > 0
     ? config.apiKey
     : undefined
@@ -101,7 +163,11 @@ function resolveOptions(ctx: Context, config: Config): AnysearchSearchProviderOp
   }
 }
 
-/** Register the AnySearch search provider with `ctx.web`. */
-export function apply(ctx: Context, config: Config): void {
+/**
+ * Register the AnySearch search provider with `ctx.web`. Options are projected
+ * through a thunk, so a re-pointed `apiKeyEnv` (the reference is volatile) is
+ * picked up by the next search without re-registering the provider.
+ */
+export function apply(ctx: Context, config: RunningConfig): void {
   ctx.web.registerSearchProvider(new AnysearchSearchProvider(() => resolveOptions(ctx, config)))
 }

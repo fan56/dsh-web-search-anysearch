@@ -93,14 +93,15 @@ refs:
 ```
 
 Or fill it from the GUI: **Settings → Plugins → the `dsh-web-search-anysearch` bundle →
-its `web-search-anysearch` row → Configure**. That page writes the same
-`ANYSEARCH_API_KEY` reference through dsh's credentials service and reports whether a
-key is currently configured. The field is write-only — a stored key never rides a
-response back to the page — and a blank field keeps the current key. The page always
-manages the default `ANYSEARCH_API_KEY` reference: if you re-point the provider's
-`apiKeyEnv` config at a different reference, the GUI row and the provider will
-disagree — keep the default and edit the credentials file directly for custom refs.
-One more click
+its `web-search-anysearch` row → Configure**. That page writes the reference the
+row's own configuration names — `apiKeyEnv`, or `ANYSEARCH_API_KEY` when config
+names none — through dsh's credentials service and reports whether a key is
+currently configured. Because that field is live, re-pointing `apiKeyEnv` moves
+the page and the provider together instead of splitting them — a settings write
+applies to the next search, a patch edit at the next start — and a key staged on
+the page is dropped if the reference changes under it. The field is
+write-only — a stored key never rides a response back to the page — and a blank
+field keeps the current key. One more click
 (**Clear key**, which asks once) removes the reference again, returning searches to the
 anonymous limits. A key supplied by the launching environment or a `.env` fallback is
 read-only, and the page says so instead of offering a write.
@@ -130,7 +131,7 @@ dsh --profile <name> --dump-config | grep -A3 'id: web$'
 
 | Field | Default | Notes |
 |---|---|---|
-| `apiKeyEnv` | `ANYSEARCH_API_KEY` | Credential reference resolved per search |
+| `apiKeyEnv` | `ANYSEARCH_API_KEY` | Credential reference resolved per search. Live: the GUI row reads the accepted value and manages that same reference; a blank value names none, so both halves use the default |
 | `apiKey` | — | Literal key; wins over the reference |
 | `endpoint` | `https://api.anysearch.com/mcp` | Env override: `ANYSEARCH_ENDPOINT` |
 | `timeoutMs` | `30000` | Per-request budget |

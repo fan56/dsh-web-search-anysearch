@@ -9,10 +9,12 @@
  *
  * The key never enters a configuration file: it is written through the official
  * `ctx.remote.credentials` namespace into the Host's managed credentials
- * document, under the same reference the provider resolves (`apiKeyEnv`,
- * default `ANYSEARCH_API_KEY`). The provider re-resolves that reference on every
- * search, so a saved (or cleared) key applies to the next search with no
- * restart.
+ * document. The reference is the entry's own `apiKeyEnv` — the volatile config
+ * value the Plugins page hands this row — falling back to the provider's
+ * documented default (`ANYSEARCH_API_KEY`) only when the owner delivers no form.
+ * The provider re-resolves that reference on every search, so a saved (or
+ * cleared) key applies to the next search with no restart, and re-pointing
+ * `apiKeyEnv` moves the row and the provider together instead of splitting them.
  *
  * Artifact form: the browser module table loads a classic script that registers a
  * lazy factory with `window.__ModuleLoader__.load`. This source is therefore a
@@ -32,14 +34,27 @@ void (function anysearchApiKeyRow() {
   const ROW_KEY = `${PACKAGE}#${ROW_ID}`
 
   /**
-   * Credential reference this row writes. Spelled out rather than imported: a
-   * Client half must not depend on a Host package, and this is the provider's
-   * documented `apiKeyEnv` default (`src/index.ts`).
+   * Reference this row manages when the row configuration names no usable one
+   * (no form, an empty value, or a blank/non-string `apiKeyEnv`). Spelled out
+   * rather than imported: a Client half must not depend on a Host package, and
+   * this is the provider's documented `apiKeyEnv` default (`src/index.ts`) —
+   * which falls back the same way, so both halves agree. A configured
+   * `apiKeyEnv` wins over it; see {@link credentialRefOf}.
    */
-  const API_KEY_REF = 'ANYSEARCH_API_KEY'
+  const DEFAULT_API_KEY_REF = 'ANYSEARCH_API_KEY'
 
   /** Dictionary namespace owned by this page. */
   const NS = 'settings.anysearchApiKey'
+
+  /**
+   * The row's configuration as the owner hands it to this page. Only volatile
+   * fields ride the entry's settings form, and `apiKeyEnv` is the volatile field
+   * this page reads: it names the credential the provider resolves, so the page
+   * must write that same reference.
+   */
+  interface ConfigPageForm {
+    state?: { value?: Record<string, unknown> }
+  }
 
   /** One credential reference as the Host reports it. */
   interface CredentialView {
@@ -71,7 +86,7 @@ void (function anysearchApiKeyRow() {
   interface ClientContext {
     effect(callback: () => (() => void) | void, label?: string): void
     locale: {
-      bind(ns: string): (key: string) => string
+      bind(ns: string): (key: string, params?: Record<string, unknown>) => string
       register(ns: string, dictionaries: { zh: Record<string, string>; en: Record<string, string> }): () => void
     }
     slots: {
@@ -88,10 +103,18 @@ void (function anysearchApiKeyRow() {
   interface CardProps {
     /** `summary` asks for the row's one-liner; `page` for the form. */
     view: 'summary' | 'page'
-    t(key: string): string
-    describe(): Promise<CredentialState>
-    setKey(value: string): Promise<void>
-    clearKey(): Promise<void>
+    /** The row's own configuration, delivered while the entry's settings form is served. */
+    form?: ConfigPageForm | undefined
+    t(key: string, params?: Record<string, unknown>): string
+    describe(ref: string): Promise<CredentialState>
+    setKey(ref: string, value: string): Promise<void>
+    clearKey(ref: string): Promise<void>
+  }
+
+  /** A staged key, tagged with the reference it was typed under. */
+  interface Draft {
+    ref: string
+    text: string
   }
 
   /** Which credential action is in flight, and what the last one settled as. */
@@ -101,7 +124,7 @@ void (function anysearchApiKeyRow() {
   const zh: Record<string, string> = {
     summary: '用你自己的 AnySearch 凭据驱动 web_search（匿名也能搜，配的是限额）。',
     apiKey: 'API Key',
-    apiKeyHint: '写入凭据文件的 ANYSEARCH_API_KEY；留空表示保持当前密钥。',
+    apiKeyHint: '写入凭据文件的 {ref}；留空表示保持当前密钥。',
     keySet: '已配置密钥',
     keyUnset: '未配置（匿名限额）',
     loading: '正在读取凭据状态…',
@@ -123,7 +146,7 @@ void (function anysearchApiKeyRow() {
   const en: Record<string, string> = {
     summary: 'Drives web_search with your own AnySearch credential (anonymous works too, at lower limits).',
     apiKey: 'API key',
-    apiKeyHint: 'Stores the ANYSEARCH_API_KEY credential; leave blank to keep the current key.',
+    apiKeyHint: 'Stores the {ref} credential; leave blank to keep the current key.',
     keySet: 'A key is configured',
     keyUnset: 'No key (anonymous limits)',
     loading: 'Reading credential state…',
@@ -152,6 +175,20 @@ void (function anysearchApiKeyRow() {
     return String(error)
   }
 
+  /**
+   * The credential reference this page manages: the row's configured `apiKeyEnv`,
+   * or the provider's default whenever that configuration names no usable one.
+   * Reading it from the row's own configuration is what keeps a re-pointed
+   * reference from splitting the GUI away from the provider.
+   */
+  function credentialRefOf(form: ConfigPageForm | undefined): string {
+    const declared = form?.state?.value?.apiKeyEnv
+    // A blank or whitespace-only name is not a reference the provider could
+    // resolve, so treat it as absent rather than writing an unusable ref.
+    const name = typeof declared === 'string' ? declared.trim() : ''
+    return name.length > 0 ? name : DEFAULT_API_KEY_REF
+  }
+
   /** Resolve the credentials namespace, or fail with something a reader can act on. */
   function credentialsSeam(ctx: ClientContext): CredentialsSeam {
     const seam = ctx.remote === undefined ? undefined : ctx.remote.credentials
@@ -176,9 +213,9 @@ void (function anysearchApiKeyRow() {
   }
 
   /** Read whether the reference this row writes currently holds a key, and whether it is writable. */
-  async function readCredential(ctx: ClientContext): Promise<CredentialState> {
-    const response = unwrap(await credentialsSeam(ctx).describe([API_KEY_REF]), 'credentials.describe')
-    const view = response === undefined || response.value === undefined ? undefined : response.value[API_KEY_REF]
+  async function readCredential(ctx: ClientContext, ref: string): Promise<CredentialState> {
+    const response = unwrap(await credentialsSeam(ctx).describe([ref]), 'credentials.describe')
+    const view = response === undefined || response.value === undefined ? undefined : response.value[ref]
     return {
       configured: view !== undefined && view.configured === true,
       writable: !(view !== undefined && view.writable === false),
@@ -211,7 +248,10 @@ void (function anysearchApiKeyRow() {
       /** The row's configuration page: one write-only key field, plus the clear that removes it. */
       function ApiKeyCard(props: CardProps) {
         const t = props.t
-        const [draft, setDraft] = useState('')
+        // The reference the provider resolves for this entry. It comes from the
+        // row's configuration, so re-pointing `apiKeyEnv` moves this page with it.
+        const ref = credentialRefOf(props.form)
+        const [draft, setDraft] = useState<Draft>({ ref, text: '' })
         const [credential, setCredential] = useState<{
           loaded: boolean
           configured: boolean
@@ -222,6 +262,28 @@ void (function anysearchApiKeyRow() {
         const [failure, setFailure] = useState('')
         const [confirming, setConfirming] = useState(false)
         const alive = useRef(true)
+        /**
+         * The reference currently in force, readable from a closure that captured
+         * an older one — a save or clear still in flight when the row config
+         * re-points `apiKeyEnv`. Synced in an effect, never during render: a render
+         * can be discarded, and a ref written there could hold a reference that
+         * never committed.
+         */
+        const inForce = useRef(ref)
+
+        useEffect(() => {
+          inForce.current = ref
+          // Everything the page says belongs to the reference it was read for, so
+          // a re-point starts the page over: the badge goes back to "reading"
+          // (its Clear control is gated on `configured`), and an in-flight or
+          // settled action's phase/notice is dropped. Without the phase reset a
+          // save or clear that is still running would keep `busy` true forever,
+          // because the guard below skips its own `setPhase`.
+          setCredential({ loaded: false, configured: false, writable: true, error: '' })
+          setPhase('idle')
+          setFailure('')
+          setConfirming(false)
+        }, [ref])
 
         useEffect(() => {
           // Set inside the effect body (not just cleared in the cleanup) so a
@@ -233,19 +295,38 @@ void (function anysearchApiKeyRow() {
           }
         }, [])
 
-        const load = useCallback(async () => {
-          try {
-            const next = await props.describe()
-            if (!alive.current) return
-            setCredential({ loaded: true, configured: next.configured, writable: next.writable, error: '' })
-          } catch (error) {
-            if (!alive.current) return
-            setCredential({ loaded: false, configured: false, writable: false, error: messageOf(error) })
-          }
-        }, [props.describe])
+        /**
+         * Read the state of the reference now in force into the badge.
+         * `stillWanted` is required, not optional: both call sites — the effect
+         * below and the re-read `settle` triggers — must state a liveness rule, so
+         * an unguarded `load()` cannot look safe while letting a superseded read
+         * paint the badge.
+         */
+        const load = useCallback(
+          async (stillWanted: () => boolean) => {
+            try {
+              const next = await props.describe(ref)
+              if (!alive.current || !stillWanted()) return
+              setCredential({ loaded: true, configured: next.configured, writable: next.writable, error: '' })
+            } catch (error) {
+              if (!alive.current || !stillWanted()) return
+              setCredential({ loaded: false, configured: false, writable: false, error: messageOf(error) })
+            }
+          },
+          [props.describe, ref],
+        )
 
         useEffect(() => {
-          void load()
+          // The reference can change under a still-pending read (the row config
+          // re-points `apiKeyEnv`), so this run passes a liveness check of its
+          // own: a response that arrives after the switch — or after this
+          // effect's cleanup — is dropped, and only the read for the reference
+          // now in force may paint the badge.
+          let cancelled = false
+          void load(() => !cancelled)
+          return () => {
+            cancelled = true
+          }
         }, [load])
 
         /** Run one credential action, then re-read the state it changed. */
@@ -256,22 +337,43 @@ void (function anysearchApiKeyRow() {
             try {
               await run()
               if (!alive.current) return
-              setDraft('')
+              // The action's outcome belongs to the reference it started on. If
+              // the row config re-pointed `apiKeyEnv` while the write was in
+              // flight, the page is now the new reference's, and its own read
+              // supplies both the badge and the notice — a "saved"/"cleared"
+              // notice for a reference that is no longer in force would mislead.
+              if (inForce.current !== ref) return
+              setDraft({ ref, text: '' })
               setConfirming(false)
               setPhase(kind === 'save' ? 'saved' : 'cleared')
-              await load()
+              // `load` closes over the reference this action started on, and the
+              // reference can move again while this read is pending: the guard
+              // keeps a superseded response off the badge, exactly like the
+              // effect's own run.
+              await load(() => inForce.current === ref)
             } catch (error) {
-              if (!alive.current) return
+              // A refusal whose reference is already gone is dropped along with
+              // the notice, deliberately: the page has moved on to another
+              // reference, whose own read reports that reference's state. Showing
+              // the old reference's failure on the new one would attribute it to
+              // the wrong credential. (The user acted on the reference the page
+              // showed at the time; the write itself did happen.)
+              if (!alive.current || inForce.current !== ref) return
               setPhase('failed')
               setFailure(messageOf(error))
             }
           },
-          [load],
+          [load, ref],
         )
 
         // The row's detail page asks for `summary` only when the package ships no
         // description of its own; either way it is one line, not the form.
         if (props.view === 'summary') return t('summary')
+
+        // A staged key belongs to the reference it was typed under: if the row's
+        // configuration re-points `apiKeyEnv` under a half-typed value, that text
+        // must not be saved into the reference that is now in force.
+        const staged = draft.ref === ref ? draft.text : ''
 
         const busy = phase === 'saving' || phase === 'clearing'
         const labels = {
@@ -284,7 +386,7 @@ void (function anysearchApiKeyRow() {
         const state = {
           available: credential.loaded,
           writable: credential.writable,
-          dirty: draft.trim().length > 0,
+          dirty: staged.trim().length > 0,
           invalid: false,
           saving: busy,
           failed: phase === 'failed',
@@ -295,13 +397,13 @@ void (function anysearchApiKeyRow() {
             key: 'key',
             id: 'anysearch-api-key',
             label: t('apiKey'),
-            hint: t('apiKeyHint'),
+            hint: t('apiKeyHint', { ref }),
             disabled: !credential.writable || busy,
-            text: draft,
+            text: staged,
             configured: credential.configured,
             stateLabel: credential.configured ? t('keySet') : t('keyUnset'),
             onEdit: (text: string) => {
-              setDraft(text)
+              setDraft({ ref, text })
               if (!busy) {
                 setPhase('idle')
                 setFailure('')
@@ -328,7 +430,7 @@ void (function anysearchApiKeyRow() {
                         size: 'sm',
                         disabled: busy,
                         onClick: () => {
-                          void settle(() => props.clearKey(), 'clear')
+                          void settle(() => props.clearKey(ref), 'clear')
                         },
                       },
                       t('clearConfirm'),
@@ -381,10 +483,15 @@ void (function anysearchApiKeyRow() {
               labels,
               state,
               onSave: () => {
-                void settle(() => props.setKey(draft.trim()), 'save')
+                // An empty field is not a write: the form gates Save on `dirty`,
+                // and removing a key is the Clear control's job. Writing '' into a
+                // reference the user never targeted would be a destructive no-op
+                // nobody asked for.
+                if (staged.trim().length === 0) return
+                void settle(() => props.setKey(ref, staged.trim()), 'save')
               },
               onDiscard: () => {
-                setDraft('')
+                setDraft({ ref, text: '' })
                 setPhase('idle')
                 setFailure('')
                 setConfirming(false)
@@ -421,18 +528,22 @@ void (function anysearchApiKeyRow() {
        */
       const inject = ['slots', 'locale', 'remote', 'remote.credentials']
 
-      /** Register the row page and the copy it renders. */
+      /**
+       * Register the row page and the copy it renders. Every credential action
+       * takes the reference as an argument: the page resolves it from the row's
+       * own configuration, which the owner hands over as a prop.
+       */
       function apply(ctx: ClientContext): void {
         const t = ctx.locale.bind(NS)
         ctx.effect(() => ctx.locale.register(NS, { zh, en }), `${PACKAGE}: dictionaries`)
         const actions = {
           t,
-          describe: () => readCredential(ctx),
-          setKey: async (value: string) => {
-            unwrap(await credentialsSeam(ctx).set(API_KEY_REF, value), 'credentials.set')
+          describe: (ref: string) => readCredential(ctx, ref),
+          setKey: async (ref: string, value: string) => {
+            unwrap(await credentialsSeam(ctx).set(ref, value), 'credentials.set')
           },
-          clearKey: async () => {
-            unwrap(await credentialsSeam(ctx).unset(API_KEY_REF), 'credentials.unset')
+          clearKey: async (ref: string) => {
+            unwrap(await credentialsSeam(ctx).unset(ref), 'credentials.unset')
           },
         }
         // `slots.inject` rather than a bare `register`: the Plugins page declares

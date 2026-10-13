@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- **The GUI row and the provider now share one credential reference.** `apiKeyEnv` is a volatile field, so the entry has a settings section and the Plugins row page receives the row's own configuration: the page reads the reference named there (`apiKeyEnv`, default `ANYSEARCH_API_KEY`) instead of assuming the default, and the field hint names the reference it writes. A re-pointed `apiKeyEnv` therefore moves the page and the provider together — previously the page kept writing `ANYSEARCH_API_KEY` while the provider read the configured reference, and only a hand-edited credentials file avoided the split. `apply` projects the value through the live reference, so the next search uses what the field currently holds, and the page falls back to the documented default when an owner delivers no form. A key staged on the page is tagged with the reference it was typed under, so text entered for one reference is never saved into another — and a save with nothing staged writes nothing at all. A blank or whitespace-only `apiKeyEnv` names no reference: both halves fall back to the documented default rather than the GUI and the provider disagreeing about a name that cannot resolve, and a read that arrives after the reference changed under it is dropped instead of painting the previous reference's badge — including the re-read a save or clear triggers when the reference moved while the write was in flight. The schema is annotated `z<Config, RunningConfig>`, so it must keep accepting what a configuration layer states and keep emitting what `apply` receives: drift between the schema and either declared shape is a typecheck failure rather than a silent divergence, and a test pins the one literal the two halves each carry (the default reference) so they cannot drift apart. The badge resets to "reading" the moment the reference changes, and a save/clear notice is skipped once its reference is no longer in force — the reset clears the phase, the failure and any armed confirmation too, so a save or clear that is still in flight when the reference moves cannot leave the page permanently busy. 49 tests (39 before).
+
 ## [0.7.0] - 2026-10-12
 
 ### Added

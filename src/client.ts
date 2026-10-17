@@ -94,6 +94,41 @@ void (function anysearchApiKeyRow() {
     clearKey(): Promise<void>
   }
 
+  /** The pieces of `@deepseek-ai/dsh-client-ui-primitives` this page renders with. */
+  interface Primitives {
+    SettingsForm: unknown
+    SettingsSecretField: unknown
+    Button: unknown
+  }
+
+  /**
+   * Resolve the shared primitives module, or `undefined` when the host's web
+   * client no longer serves the id. `require` throws inside the module-loader
+   * factory when the specifier is absent from the client bundle's registry —
+   * that throw must never escape the factory (it would break the whole page
+   * at materialization), so every call site gets an explicit degrade path.
+   */
+  function tryRequirePrimitives(
+    require: (specifier: string) => unknown,
+  ): Primitives | undefined {
+    try {
+      const mod = require('@deepseek-ai/dsh-client-ui-primitives') as
+        | Partial<Primitives>
+        | undefined
+      if (
+        mod === undefined ||
+        mod.SettingsForm === undefined ||
+        mod.SettingsSecretField === undefined ||
+        mod.Button === undefined
+      ) {
+        return undefined
+      }
+      return mod as Primitives
+    } catch {
+      return undefined
+    }
+  }
+
   /** Which credential action is in flight, and what the last one settled as. */
   type Phase = 'idle' | 'saving' | 'clearing' | 'saved' | 'cleared' | 'failed'
 
@@ -108,6 +143,7 @@ void (function anysearchApiKeyRow() {
     loadFailed: '读取凭据状态失败。',
     unavailable: '本部署没有提供凭据服务，无法在这里写入密钥。',
     readOnly: '凭据来源是只读的，无法在这里写入。',
+    uiUnavailable: '当前 dsh web 前端不提供本页依赖的界面组件（client-ui-primitives），请升级 dsh 后重试。',
     save: '保存',
     saving: '保存中…',
     saved: '已保存，下一次搜索即生效。',
@@ -130,6 +166,7 @@ void (function anysearchApiKeyRow() {
     loadFailed: 'Could not read the credential state.',
     unavailable: 'This deployment serves no credential service, so a key cannot be written here.',
     readOnly: 'The credential source is read-only, so a key cannot be written here.',
+    uiUnavailable: 'This dsh web frontend does not serve the UI components (client-ui-primitives) this page renders with; upgrade dsh and retry.',
     save: 'Save',
     saving: 'Saving…',
     saved: 'Saved; it applies to the next search.',
@@ -195,11 +232,21 @@ void (function anysearchApiKeyRow() {
     id: PACKAGE,
     factory(require) {
       const React = require('react')
-      const primitives = require('@deepseek-ai/dsh-client-ui-primitives')
       const h = React.createElement
-      const SettingsForm = primitives.SettingsForm
-      const SettingsSecretField = primitives.SettingsSecretField
-      const Button = primitives.Button
+      // The shared primitives specifier is resolved try-style, on purpose.
+      // The npm package left the host's dependency graph in dsh 0.2.1 (the
+      // web client UI rework folded it into the core bundle), but the module
+      // id itself lives on in the deployed web client's specifier table —
+      // every official settings page, including rc.2's own web-search
+      // settings page, requires the exact same specifier inside the same
+      // `__ModuleLoader__` factory pattern. Should a future host drop the id
+      // after all, a throwing factory would take this whole plugin page down
+      // at materialization; the catch keeps the row alive and the card
+      // degrades to a readable notice below.
+      const primitives = tryRequirePrimitives(require)
+      const SettingsForm = primitives?.SettingsForm
+      const SettingsSecretField = primitives?.SettingsSecretField
+      const Button = primitives?.Button
 
       // `require` hands back untyped modules; these four bindings are the only
       // React surface this page uses, typed so the component body stays checked.
@@ -272,6 +319,17 @@ void (function anysearchApiKeyRow() {
         // The row's detail page asks for `summary` only when the package ships no
         // description of its own; either way it is one line, not the form.
         if (props.view === 'summary') return t('summary')
+
+        // Degraded host: the web client no longer serves the primitives id
+        // (defensive — verified present in every shipped core bundle through
+        // dsh 0.2.1-rc.2). One readable line instead of a broken form.
+        if (primitives === undefined) {
+          return h(
+            'p',
+            { role: 'status', style: { margin: '0', fontSize: '13px', lineHeight: '20px' } },
+            t('uiUnavailable'),
+          )
+        }
 
         const busy = phase === 'saving' || phase === 'clearing'
         const labels = {

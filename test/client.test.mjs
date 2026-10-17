@@ -114,7 +114,10 @@ async function boot(options = {}) {
   }
   const client = entry.factory((specifier) => {
     if (specifier === 'react') return createReact(options.states ?? [])
-    if (specifier === '@deepseek-ai/dsh-client-ui-primitives') return PRIMITIVES
+    if (specifier === '@deepseek-ai/dsh-client-ui-primitives') {
+      if (options.primitivesMissing) throw new Error(`Cannot find module '${specifier}' supplied`)
+      return PRIMITIVES
+    }
     throw new Error(`unexpected require: ${specifier}`)
   })
   client.apply(ctx)
@@ -328,4 +331,73 @@ test('a settled action reports itself, and a refusal keeps its detail', async ()
   assert.equal(noticeOf(failed.tree), 'credential/rejected: nope')
   assert.equal(form(failed.tree).props.state.failed, true)
   assert.equal(noticeOf(idle.tree), undefined, 'a quiet page says nothing')
+})
+
+// ---------------------------------------------------------------------------
+// dsh 0.2.1: the web client UI rework removed the npm packages
+// (dsh-client-store / dsh-client-ui-primitives / dsh-client-ui-slots) from the
+// host's dependency graph, but the module ids live on in the deployed web
+// client's core bundle. Evidence, taken from the 0.2.1-rc.2 install closure:
+// `@deepseek-ai/dsh-web-frontend/dist/assets/index-*.js` carries the core
+// specifier table that backs every `__ModuleLoader__` factory `require` —
+// `@deepseek-ai/dsh-client-store`, `@deepseek-ai/dsh-client-ui-slots`,
+// `@deepseek-ai/dsh-client-ui-primitives` (and dockkit) are all still served —
+// and rc.2's own `dsh-client-ui-settings-web-search/lib/client.js` requires the
+// exact same primitives specifier inside the same factory pattern. The tests
+// below pin that contract: every specifier this artifact requires must be one
+// the rc.2 web client registry serves, and a host that ever drops the id must
+// degrade to a readable notice instead of taking the row down.
+// ---------------------------------------------------------------------------
+
+/** The specifier table the rc.2 web client core bundle serves (see block comment). */
+const RC2_CORE_REGISTRY = new Set([
+  'react',
+  'react/jsx-runtime',
+  'react-dom',
+  'react-dom/client',
+  '@deepseek-ai/cordis',
+  'zod',
+  '@tanstack/react-virtual',
+  '@deepseek-ai/dsh-client-store',
+  '@deepseek-ai/dsh-client-ui-slots',
+  '@deepseek-ai/dsh-client-ui-primitives',
+  '@deepseek-ai/dsh-client-ui-dockkit',
+])
+
+test('every specifier the artifact requires is one the dsh 0.2.1 web client registry serves', () => {
+  const specifiers = [...artifact.matchAll(/require\((["'])(.+?)\1\)/g)].map((match) => match[2])
+  assert.ok(specifiers.includes('@deepseek-ai/dsh-client-ui-primitives'),
+    'the settings page still rides the shared primitives id (same one the official rc.2 pages require)')
+  const unknown = [...new Set(specifiers)].filter((specifier) => !RC2_CORE_REGISTRY.has(specifier))
+  assert.deepEqual(unknown, [],
+    'specifiers outside the rc.2 core registry would break the page at materialization')
+})
+
+test('a host that stops serving the primitives id degrades to the uiUnavailable notice, not a dead row', async () => {
+  const states = ['', { loaded: false, configured: false, writable: true, error: '' }, 'idle', '', false]
+  const page = await boot({ primitivesMissing: true, states })
+  const t = (key) => page.record.dictionaries.zh[key] ?? `!!missing:${key}`
+  const { component } = page.record.registrations[0]
+  const tree = component({
+    view: 'page',
+    t,
+    describe: async () => ({ loaded: true, configured: false, writable: true }),
+    setKey: async () => {},
+    clearKey: async () => {},
+  })
+  assert.equal(tree.type, 'p', 'the degraded page renders one status line')
+  assert.equal(tree.children[0], page.record.dictionaries.zh.uiUnavailable,
+    'the line tells the reader the web frontend lacks the UI components')
+  assert.ok(!JSON.stringify(tree).includes('SettingsForm'), 'no form is rendered from undefined primitives')
+
+  // The summary view never needed primitives and must keep working.
+  const summary = await boot({ primitivesMissing: true, states: [''] })
+  const oneLiner = summary.record.registrations[0].component({
+    view: 'summary',
+    t: (key) => summary.record.dictionaries.zh[key] ?? `!!missing:${key}`,
+    describe: async () => ({ loaded: true, configured: false, writable: true }),
+    setKey: async () => {},
+    clearKey: async () => {},
+  })
+  assert.equal(oneLiner, summary.record.dictionaries.zh.summary, 'summary stays the one-liner')
 })

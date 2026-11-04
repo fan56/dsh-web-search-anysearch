@@ -10,7 +10,7 @@
     "search",
     "anysearch"
   ],
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/fan56/dsh-web-search-anysearch.git"

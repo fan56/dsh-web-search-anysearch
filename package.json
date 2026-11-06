@@ -1,6 +1,6 @@
 {
   "name": "@aiwayds/dsh-web-search-anysearch",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "AnySearch web search provider plugin for DeepSeek Harness (dsh)",
   "keywords": [
     "dsh",
@@ -49,12 +49,13 @@
     "@deepseek-ai/dsh-launch-environment": ">=0.2.0-rc.2"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
     "@deepseek-ai/cordis": "4.1.0",
-    "@deepseek-ai/schemastery": "3.19.0",
-    "@deepseek-ai/dsh-web": "0.2.2-rc.1",
     "@deepseek-ai/dsh-credentials": "0.2.2-rc.1",
     "@deepseek-ai/dsh-launch-environment": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-llm": "0.2.2-rc.1",
+    "@deepseek-ai/dsh-web": "0.2.2-rc.1",
+    "@deepseek-ai/schemastery": "3.19.0",
+    "@types/node": "^24.0.0",
     "typescript": "^5.9.0"
   },
   "dsh": {

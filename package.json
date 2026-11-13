@@ -38,7 +38,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/build-client.mjs",
     "check": "tsc --noEmit -p tsconfig.json",
-    "test": "npm run build && node --test test/transport.test.mjs test/markdown.test.mjs test/provider.test.mjs test/apply.test.mjs test/client.test.mjs test/bundle-patch.test.mjs",
+    "test": "npm run build && node --test test/transport.test.mjs test/markdown.test.mjs test/provider.test.mjs test/apply.test.mjs test/client.test.mjs test/bundle-patch.test.mjs && node test/packaged-upgrade.test.mjs",
     "smoke": "node scripts/smoke-boot.mjs"
   },
   "peerDependencies": {

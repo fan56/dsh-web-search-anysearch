@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- npm packaged upgrade regression test (pnpm 11 strictDepBuilds, see dsh-subagent-registry#10).
+
 ### Changed
 - **Dev closure re-pinned to `0.2.2-rc.2`** (`dsh-web` / `dsh-credentials` / `dsh-launch-environment` / `dsh-llm` devDependencies `0.2.2-rc.1` → `0.2.2-rc.2`; `package-lock.json` regenerated against registry.npmjs.org). The dev-only `@deepseek-ai/cordis` (`4.1.0`) and `@deepseek-ai/schemastery` (`3.19.0`) pins already match what the rc.2 closure ships (`~4.1.0` / `~3.19.0`) — zero action there. Peer floors stay `>= 0.2.0-rc.2` — the host preflight satisfies with `includePrerelease`, so the floor already matches the new rc. The CI host-resolution step already resolves the newest of the `latest`/`next` dist-tags with the prerelease-aware comparator (release.yml has no host step; no workflow change this wave). Mechanical dependency ride, no source changes. Re-verified against the scratch 0.2.2-rc.2 host closure (the same shape CI builds): tsc check clean, 51 tests pass / 0 fail, boot smoke PASS on the real host (composed, 25s boot window survived, removal restored the stock tree).
 
